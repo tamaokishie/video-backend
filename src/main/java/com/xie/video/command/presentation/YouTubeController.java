@@ -1,45 +1,45 @@
 package com.xie.video.command.presentation;
 
-import com.xie.video.command.application.YouTubeService;
-import com.xie.video.command.presentation.dto.YouTubeVideoDto;
-
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
-import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
+
+import com.xie.video.command.presentation.dto.YouTubeVideoDto;
 
 @RestController
 @RequestMapping("/youtube")
 public class YouTubeController {
 
-    private final OAuth2AuthorizedClientService clientService;
-    private final YouTubeService youTubeService;
+    @GetMapping("/videos")
+    public List<YouTubeVideoDto> getVideos(
+        @RegisteredOAuth2AuthorizedClient("google") OAuth2AuthorizedClient authorizedClient) {
 
-    public YouTubeController(OAuth2AuthorizedClientService clientService, YouTubeService youTubeService) {
-        this.clientService = clientService;
-        this.youTubeService = youTubeService;
-    }
+        String accessToken = authorizedClient.getAccessToken().getTokenValue();
+        String playlistId = "PLINGkNFSbpzdcuKVrHr2t7fgYm4FjGvbk";
+        String url = "https://www.googleapis.com/youtube/v3/playlistItems"
+                   + "?part=snippet&playlistId=" + playlistId + "&maxResults=50";
 
-    @GetMapping("/private-videos")
-    public List<YouTubeVideoDto> getPrivateVideos(
-            @RequestParam String playlistId,
-            OAuth2AuthenticationToken authentication
-    ) {
-        if (authentication == null) {
-            throw new RuntimeException("Not authenticated");
-        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        OAuth2AuthorizedClient client = clientService.loadAuthorizedClient(
-                authentication.getAuthorizedClientRegistrationId(),
-                authentication.getName());
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
 
-        if (client == null || client.getAccessToken() == null) {
-            throw new RuntimeException("OAuth2 client or token is null");
-        }
+        List<Map<String, Object>> items = (List<Map<String, Object>>) response.getBody().get("items");
 
-        String accessToken = client.getAccessToken().getTokenValue();
-        return youTubeService.getPrivateVideos(playlistId, accessToken);
+        return items.stream().map(item -> {
+            Map<String, Object> snippet = (Map<String, Object>) item.get("snippet");
+            String videoId = (String) ((Map<String, Object>) snippet.get("resourceId")).get("videoId");
+            String title = (String) snippet.get("title");
+            return new YouTubeVideoDto(videoId, title);
+        }).collect(Collectors.toList());
     }
 }

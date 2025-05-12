@@ -7,35 +7,35 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.security.config.Customizer;
 
-import java.util.Arrays;
-
+import java.util.List;
 @Configuration
 public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .authorizeHttpRequests(authorize -> authorize
-                .requestMatchers("/youtube/**").authenticated()
-                .anyRequest().permitAll()
-            )
-            .oauth2Login(Customizer.withDefaults())
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+        .authorizeHttpRequests(authz -> authz
+        .requestMatchers("/youtube/me").authenticated()
+        .anyRequest().permitAll()
+        )
+        .csrf(csrf -> csrf.disable())
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .oauth2Login(oauth -> oauth
+            // .defaultSuccessUrl("http://localhost:3000/video-frontend", true) // ← ローカル用
+            .defaultSuccessUrl("https://tamaokishie.github.io/video-frontend", true) // ← 本番用
+        );
 
         return http.build();
     }
 
-
-    // CORS設定の定義（Spring Security用）
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("http://localhost:3000", "https://tamaokishie.github.io"));// ← ローカル用＆本番用
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE"));
+        config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
-        config.setAllowedOrigins(Arrays.asList("https://tamaokishie.github.io"));
-        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
-        config.setAllowedHeaders(Arrays.asList("*"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
